@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>神经网络原理讲解</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --bg-2: #101a2b;
+        --panel: rgba(18, 28, 46, 0.9);
+        --panel-2: rgba(24, 38, 62, 0.85);
+        --line: rgba(126, 163, 255, 0.38);
+        --primary: #7dd3fc;
+        --primary-2: #a78bfa;
+        --success: #34d399;
+        --warning: #fbbf24;
+        --danger: #f87171;
+        --text: #e5eefb;
+        --muted: #a7b9d8;
+        --shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top, rgba(125, 211, 252, 0.16), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.18), transparent 25%),
+          linear-gradient(180deg, var(--bg), var(--bg-2));
+        line-height: 1.7;
+      }
+
+      .container {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      header {
+        padding: 64px 0 24px;
+      }
+
+      .hero {
+        background: rgba(11, 16, 32, 0.72);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: 0 20px 60px var(--shadow);
+        padding: 34px 28px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 22px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        color: var(--primary);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 1.1;
+      }
+
+      .subtitle {
+        font-size: 1.06rem;
+        color: var(--muted);
+        max-width: 760px;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .tag {
+        border: 1px solid rgba(125, 211, 252, 0.35);
+        background: rgba(125, 211, 252, 0.07);
+        color: var(--primary);
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 0.82rem;
+      }
+
+      section {
+        padding: 24px 0;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+        padding: 24px 22px;
+      }
+
+      h2 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: clamp(1.4rem, 2.2vw, 2.2rem);
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: var(--text);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 18px;
+      }
+
+      .mini {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .mini h3 {
+        margin: 0 0 8px;
+        font-size: 1.1rem;
+      }
+
+      .mini p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .network-wrap {
+        display: grid;
+        gap: 22px;
+      }
+
+      .network-demo {
+        position: relative;
+        background: linear-gradient(180deg, rgba(11,16,32,0.8), rgba(18,30,50,0.88));
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        min-height: 420px;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .network-demo::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.03), transparent);
+        z-index: 0;
+      }
+
+      .layer {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 26px;
+        z-index: 1;
+      }
+
+      .input-layer { left: 6%; }
+      .hidden-layer { left: 38%; }
+      .output-layer { right: 8%; }
+
+      .node {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 600;
+        color: #0f172a;
+        box-shadow: 0 10px 18px rgba(125, 211, 252, 0.24);
+        position: relative;
+        transition: transform 0.6s ease, box-shadow 0.6s ease;
+      }
+
+      .input-layer .node { background: linear-gradient(135deg, #7dd3fc, #bfdbfe); }
+      .hidden-layer .node { background: linear-gradient(135deg, #c4b5fd, #8b5cf6); }
+      .output-layer .node { background: linear-gradient(135deg, #6ee7b7, #34d399); }
+
+      .node::after {
+        content: "";
+        position: absolute;
+        inset: -8px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.24);
+        opacity: 0.75;
+      }
+
+      .node.pulse {
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(125,211,252,0); }
+        50% { transform: scale(1.08); box-shadow: 0 0 20px rgba(125,211,252,0.42); }
+      }
+
+      .connections {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+      }
+
+      .line {
+        position: absolute;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(125,211,252,0.1), rgba(125,211,252,0.8), rgba(125,211,252,0.1));
+        transform-origin: left center;
+        animation: ping 2.6s ease-in-out infinite;
+      }
+
+      @keyframes ping {
+        0%, 100% { opacity: 0.35; }
+        50% { opacity: 1; }
+      }
+
+      .formula {
+        display: inline-block;
+        background: rgba(125, 211, 252, 0.06);
+        color: var(--primary);
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 1rem;
+      }
+
+      .process {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .step {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px 18px 14px;
+      }
+
+      .step-number {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-2));
+        color: #0f172a;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+
+      .code-box {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px 18px;
+        font-family: "Consolas", "Courier New", monospace;
+        color: #dbeafe;
+        overflow-x: auto;
+      }
+
+      .highlight-box {
+        border-left: 4px solid var(--primary);
+        background: rgba(125, 211, 252, 0.06);
+        border-radius: 0 14px 14px 0;
+        padding: 14px 16px;
+        margin: 16px 0;
+      }
+
+      .example-panel {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+      }
+
+      .example-panel ul {
+        margin: 10px 0 0 18px;
+        padding: 0;
+        color: var(--muted);
+      }
+
+      .math {
+        font-size: 1.1rem;
+        color: #dbeafe;
+        margin: 18px 0;
+      }
+
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .badges span {
+        background: rgba(52, 211, 153, 0.12);
+        color: #9ae6b4;
+        border: 1px solid rgba(52, 211, 153, 0.28);
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 0.8rem;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--muted);
+        padding: 22px 0 50px;
+      }
+
+      @media (max-width: 720px) {
+        .hero-grid { grid-template-columns: 1fr; }
+        .network-demo { min-height: 360px; }
+        .node { width: 46px; height: 46px; font-size: 0.8rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="hero">
+          <div class="hero-grid">
+            <div>
+              <div class="eyebrow">AI 学习基础</div>
+              <h1>神经网络原理讲解</h1>
+              <p class="subtitle">
+                神经网络并不神秘，它本质上是一个利用大量参数进行模式识别和函数拟合的数学模型。
+                它通过“输入 → 计算 → 输出 → 误差反馈 → 参数调整”的循环，不断学习如何把输入映射到期望结果。
+              </p>
+              <div class="tag-row">
+                <span class="tag">感知机</span>
+                <span class="tag">前向传播</span>
+                <span class="tag">激活函数</span>
+                <span class="tag">反向传播</span>
+                <span class="tag">梯度下降</span>
+              </div>
+            </div>
+            <div class="example-panel">
+              <h3 style="margin-top:0;">一条简单例子</h3>
+              <p style="margin-bottom:8px;">如果模型判断一张图里是否是“猫”，输入是像素，输出是 0 或 1。</p>
+              <ul>
+                <li>输入：图像像素值</li>
+                <li>中间层：提取边缘、轮廓、眼睛特征</li>
+                <li>输出：猫概率</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <div class="card">
+          <h2>1. 神经网络是什么</h2>
+          <p>
+            人工神经网络本质上是一个多层参数化函数，它能够从数据中学习“输入和输出之间的映射关系”。
+            每个神经元都相当于一个简单的计算单元：它接收若干个数值输入，给每个输入乘上对应的权重，再加上偏置，最后通过激活函数得到输出。
+          </p>
+          <div class="highlight-box">
+            也就是说，神经网络不是靠硬编码规则工作，而是靠大量样本训练出来的参数去自动发现规律。
+          </div>
+
+          <div class="grid">
+            <div class="mini">
+              <h3>输入层</h3>
+              <p>接收原始数据，例如像素、音频特征、文本向量，作为网络的起始状态。</p>
+            </div>
+            <div class="mini">
+              <h3>隐藏层</h3>
+              <p>负责提取越来越抽象的特征，如边缘、纹理、形状、语义。</p>
+            </div>
+            <div class="mini">
+              <h3>输出层</h3>
+              <p>生成最终结果，如分类概率、回归值、文本生成的下一个词。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card network-wrap">
+          <h2>2. 一个神经网络看起来像什么</h2>
+          <div class="network-demo" aria-label="神经网络结构示意图">
+            <div class="connections" id="connections"></div>
+            <div class="layer input-layer">
+              <div class="node pulse">x1</div>
+              <div class="node pulse">x2</div>
+              <div class="node pulse">x3</div>
+            </div>
+            <div class="layer hidden-layer">
+              <div class="node pulse">h1</div>
+              <div class="node pulse">h2</div>
+              <div class="node pulse">h3</div>
+            </div>
+            <div class="layer output-layer">
+              <div class="node pulse">y</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>3. 神经元的计算过程</h2>
+          <p>
+            每个神经元都会做一件事：先把输入线性组合，再通过激活函数加入非线性能力。一个神经元的输出可以写成：
+          </p>
+          <div class="formula">
+            z = w1x1 + w2x2 + ... + wnxn + b<br />
+            a = f(z)
+          </div>
+          <p>
+            其中：<strong>w</strong> 是权重，<strong>b</strong> 是偏置，<strong>f</strong> 是激活函数。<br />
+            这个公式的含义是：不同输入特征通过不同的权重影响最终结果，偏置用来平移决策边界，而激活函数让网络不再只是一个简单线性组合。
+          </p>
+
+          <div class="grid">
+            <div class="mini">
+              <h3>权重 w</h3>
+              <p>表示不同输入对结果的重要程度。大权重意味着该特征更关键。</p>
+            </div>
+            <div class="mini">
+              <h3>偏置 b</h3>
+              <p>决定神经元“默认倾向”向哪个方向输出，类似阈值。</p>
+            </div>
+            <div class="mini">
+              <h3>激活函数 f</h3>
+              <p>引入非线性，让网络能够表示复杂函数，例如“曲线”“组合特征”“多类别判别”。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>4. 激活函数为什么重要</h2>
+          <p>
+            激活函数负责把线性计算结果转成非线性输出。常见的激活函数包括 Sigmoid、ReLU 和 Tanh。
+          </p>
+
+          <div class="process">
+            <div class="step">
+              <div class="step-number">1</div>
+              <strong>ReLU</strong>
+              <p>如果输入小于 0，就输出 0；否则保留原值。运算简单，训练速度快。</p>
+              <div class="code-box">ReLU(x) = max(0, x)</div>
+            </div>
+            <div class="step">
+              <div class="step-number">2</div>
+              <strong>Sigmoid</strong>
+              <p>把值压缩到 0 到 1，常用于二分类的输出层。</p>
+              <div class="code-box">σ(x) = 1 / (1 + e^{-x})</div>
+            </div>
+            <div class="step">
+              <div class="step-number">3</div>
+              <strong>Tanh</strong>
+              <p>输出范围在 -1 到 1，通常比 Sigmoid 更适合隐藏层。</p>
+              <div class="code-box">tanh(x) = (e^x - e^{-x}) / (e^x + e^{-x})</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>5. 前向传播：数据从输入走到输出</h2>
+          <p>
+            前向传播是模型在推理时从输入数据一路往后计算的过程。每一层神经元都对上一层的输出执行线性变换和激活，最终输出网络的预测值。
+          </p>
+          <div class="math">
+            x^(0) → z^(1) = W^(1)x^(0) + b^(1) → a^(1) = f(z^(1)) → ... → ŷ = a^(L)
+          </div>
+          <p>
+            例如：输入一张图片时，第一层可能检测边缘，第二层检测角点和轮廓，第三层识别眼睛/鼻子等部位，最终输出“这是猫”的概率。
+            这里的关键是：每一层都在从原始数据中抽取更高层次的特征。
+          </p>
+          <div class="highlight-box">
+            前向传播的目标不是“猜测”，而是给出一个当前参数下的预测值 ŷ。随后再和真实标签 y 比较，计算误差。
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>6. 误差与反向传播</h2>
+          <p>
+            神经网络训练时，不会直接“知道”最优权重，而是先算出模型输出与真实标签之间的误差，再把误差沿着网络反向传递，调整每一层的参数。
+          </p>
+          <div class="formula">
+            loss = (ŷ - y)^2  或 交叉熵损失
+          </div>
+          <p>
+            常见的损失函数包括：均方误差（MSE）和交叉熵损失。对分类问题，交叉熵更常见；对回归问题，MSE 更常见。<br />
+            之后，计算每个参数对损失的偏导数，也就是梯度。这个过程叫做“反向传播（Backpropagation）”，它利用链式法则从输出层反向推到输入层。
+          </p>
+          <div class="badges">
+            <span>损失函数</span>
+            <span>链式法则</span>
+            <span>梯度</span>
+            <span>参数更新</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>7. 梯度下降：学习如何变得更好</h2>
+          <p>
+            训练的核心思想是让损失尽可能小。通过计算梯度，知道当前参数往哪个方向调整能减小误差。
+          </p>
+          <div class="formula">
+            w = w - η × ∂L/∂w<br />
+            b = b - η × ∂L/∂b
+          </div>
+          <p>
+            其中，η 是学习率，控制每次更新的步长。学习率过大可能导致发散，过小则训练过慢。<br />
+            训练时会使用大量样本迭代更新参数，通常称为“批量梯度下降”“随机梯度下降”“小批量梯度下降”等不同优化策略。
+          </p>
+          <div class="highlight-box">
+            训练的本质就是：不断地让模型输出更接近真实值，让误差越来越小。
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>8. 为什么神经网络能“学会”</h2>
+          <p>
+            因为它拥有大量参数，能够拟合非常复杂的函数。随着训练数据增多，网络参数会逐渐找到一组“比较好的值”，从而把输入模式和输出目标建立联系。
+            更准确地说，神经网络学习的不是某个固定规则，而是一个从数据中建立的经验模型。
+          </p>
+          <div class="grid">
+            <div class="mini">
+              <h3>适合模式识别</h3>
+              <p>图像、语音、文本中的复杂模式都可以通过多层网络处理。</p>
+            </div>
+            <div class="mini">
+              <h3>适合函数逼近</h3>
+              <p>可以拟合很多现实世界中难以手写公式的关系，甚至非常高维的数据映射。</p>
+            </div>
+            <div class="mini">
+              <h3>适合端到端学习</h3>
+              <p>从原始数据直接学习到目标结果，而不必手工设计所有特征。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>9. 总结：神经网络究竟在做什么</h2>
+          <p>
+            神经网络本质上是一个通过大量参数和非线性函数，不断调整自身权重来学习输入和输出关系的系统。<br />
+            它的核心训练流程是：
+          </p>
+          <div class="process">
+            <div class="step">
+              <div class="step-number">1</div>
+              <strong>前向传播</strong>
+              <p>输入数据经过各层运算，得到预测值 ŷ。</p>
+            </div>
+            <div class="step">
+              <div class="step-number">2</div>
+              <strong>计算损失</strong>
+              <p>用真实标签 y 与预测值比较，得到误差。</p>
+            </div>
+            <div class="step">
+              <div class="step-number">3</div>
+              <strong>反向传播</strong>
+              <p>利用链式法则，计算梯度并更新参数。</p>
+            </div>
+            <div class="step">
+              <div class="step-number">4</div>
+              <strong>梯度下降</strong>
+              <p>逐步让损失函数减小，直到网络表现足够好。</p>
+            </div>
+          </div>
+          <p style="margin-top:16px;">
+            这正是深度学习能够在图像识别、语音识别、自然语言处理、推荐系统、自动驾驶等领域取得巨大成功的核心原因。
+          </p>
+        </div>
+      </section>
+
+      <div class="footer-note">
+        讲解结束：神经网络不是“魔法”，而是大量数学计算和参数优化的结果。
+      </div>
+    </div>
+
+    <script>
+      function drawConnections() {
+        const container = document.getElementById('connections');
+        const inputNodes = document.querySelectorAll('.input-layer .node');
+        const hiddenNodes = document.querySelectorAll('.hidden-layer .node');
+        const outputNodes = document.querySelectorAll('.output-layer .node');
+
+        const drawLine = (x1, y1, x2, y2) => {
+          const line = document.createElement('div');
+          const length = Math.hypot(x2 - x1, y2 - y1);
+          const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+          line.className = 'line';
+          line.style.width = length + 'px';
+          line.style.left = x1 + 'px';
+          line.style.top = y1 + 'px';
+          line.style.transform = 'rotate(' + angle + 'deg)';
+          container.appendChild(line);
+        };
+
+        const demoRect = document.querySelector('.network-demo').getBoundingClientRect();
+        const inputArea = document.querySelector('.input-layer');
+        const hiddenArea = document.querySelector('.hidden-layer');
+        const outputArea = document.querySelector('.output-layer');
+
+        const inputRect = inputArea.getBoundingClientRect();
+        const hiddenRect = hiddenArea.getBoundingClientRect();
+        const outputRect = outputArea.getBoundingClientRect();
+
+        inputNodes.forEach((node, i) => {
+          const from = node.getBoundingClientRect();
+          hiddenNodes.forEach((hiddenNode) => {
+            const to = hiddenNode.getBoundingClientRect();
+            drawLine(
+              from.right - demoRect.left,
+              from.top - demoRect.top + from.height / 2,
+              to.left - demoRect.left,
+              to.top - demoRect.top + to.height / 2
+            );
+          });
+        });
+
+        hiddenNodes.forEach((hiddenNode) => {
+          const from = hiddenNode.getBoundingClientRect();
+          outputNodes.forEach((outNode) => {
+            const to = outNode.getBoundingClientRect();
+            drawLine(
+              from.right - demoRect.left,
+              from.top - demoRect.top + from.height / 2,
+              to.left - demoRect.left,
+              to.top - demoRect.top + to.height / 2
+            );
+          });
+        });
+      }
+
+      window.addEventListener('load', drawConnections);
+      window.addEventListener('resize', drawConnections);
+    </script>
+  </body>
+</html>
